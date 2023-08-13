@@ -7,6 +7,7 @@
 #include "VoltageController.h"
 #include <frc/interfaces/Gyro.h>
 #include "PID.h"
+#include <ctre/phoenix.h>
 
 #include <units/angular_velocity.h>
 #include <units/charge.h>
@@ -100,7 +101,7 @@ namespace wom {
 
     wpi::array<SwerveModuleConfig, 4> modules;
 
-    wom::Gyro *gyro;
+    Pigeon2 *gyro;
 
     pose_angle_conf_t poseAnglePID;
     pose_position_conf_t posePositionPID;

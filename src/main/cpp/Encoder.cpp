@@ -129,7 +129,7 @@ double DutyCycleEncoder::GetEncoderTickVelocity() const {
 
 CanEncoder::CanEncoder(int deviceNumber, double ticksPerRotation, double reduction)
   : Encoder(ticksPerRotation, reduction, 1) {
-    _canEncoder = new CANCoder(deviceNumber);
+    _canEncoder = new CANCoder(deviceNumber, "Drivebase");
   }
 
 double CanEncoder::GetEncoderRawTicks() const {

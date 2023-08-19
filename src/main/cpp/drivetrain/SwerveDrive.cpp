@@ -248,7 +248,7 @@ void SwerveDrive::OnUpdate(units::second_t dt) {
   }
 
   _poseEstimator.Update(
-    _config.gyro->GetRotation2d(),
+  frc::Rotation2d(_config.gyro->GetRoll(), _config.gyro->GetPitch()),
     wpi::array<frc::SwerveModulePosition, 4>{
       _modules[0].GetPosition(),
       _modules[1].GetPosition(),
@@ -347,13 +347,15 @@ bool SwerveDrive::IsAtSetPose() {
 }
 
 void SwerveDrive::ResetPose(frc::Pose2d pose) {
-  _poseEstimator.ResetPosition(_config.gyro->GetRotation2d(),
+  _poseEstimator.ResetPosition(
+    frc::Rotation2d(_config.gyro->GetRoll(), _config.gyro->GetPitch()),
     wpi::array<frc::SwerveModulePosition, 4>{
       _modules[0].GetPosition(),
       _modules[1].GetPosition(),
       _modules[2].GetPosition(),
       _modules[3].GetPosition()
-    }, pose
+    },
+    pose
   );
 }
 
@@ -374,8 +376,8 @@ void SwerveDrive::SetZero() {
 wom::sim::SwerveDriveSim::SwerveDriveSim(SwerveDriveConfig config, units::kilogram_square_meter_t moduleJ)
   : config(config), kinematics(config.modules[0].position, config.modules[1].position, config.modules[2].position, config.modules[3].position),
     moduleJ(moduleJ),
-    table(nt::NetworkTableInstance::GetDefault().GetTable(config.path + "/sim")),
-    gyro(config.gyro->MakeSimGyro())
+    table(nt::NetworkTableInstance::GetDefault().GetTable(config.path + "/sim"))
+    // gyro(config.gyro->MakeSimGyro())
   {
     for (size_t i = 0; i < config.modules.size(); i++) {
       driveEncoders.push_back(config.modules[i].driveMotor.encoder->MakeSimEncoder());

@@ -8,8 +8,7 @@
 #include <ctre/phoenix.h>
 #include <frc/DutyCycleEncoder.h>
 
-#include "sim/SimEncoder.h"
-#include "Util.h"
+#include "utils/Util.h"
 
 namespace wom {
   class Encoder {
@@ -32,8 +31,6 @@ namespace wom {
     units::radians_per_second_t GetEncoderAngularVelocity();   // rad/s
 
     int encoderType = 0;
-
-    virtual std::shared_ptr<sim::SimCapableEncoder> MakeSimEncoder() = 0;
     double _reduction = 1.0;
    private:
     double _encoderTicksPerRotation;
@@ -49,8 +46,6 @@ namespace wom {
 
     double GetEncoderRawTicks() const override;
     double GetEncoderTickVelocity() const override;
-
-    std::shared_ptr<sim::SimCapableEncoder> MakeSimEncoder() override;
    private:
     frc::Encoder _nativeEncoder;
   };
@@ -63,15 +58,9 @@ namespace wom {
     double GetEncoderRawTicks() const override;
     double GetEncoderTickVelocity() const override;
 
-
-    std::shared_ptr<sim::SimCapableEncoder> MakeSimEncoder() override;
    protected:
     rev::SparkMaxRelativeEncoder _encoder;
     friend class SimCANSparkMaxEncoder;
-
-    // For simulation
-    double _simTicks{0};
-    double _simVelocity{0};
   };
 
   class TalonFXEncoder : public Encoder {
@@ -81,8 +70,6 @@ namespace wom {
     double GetEncoderRawTicks() const override;
     double GetEncoderTickVelocity() const override;
 
-
-    std::shared_ptr<sim::SimCapableEncoder> MakeSimEncoder() override;
    private:
     ctre::phoenix::motorcontrol::can::TalonFX *_controller;
   };
@@ -94,8 +81,6 @@ namespace wom {
     double GetEncoderRawTicks() const override;
     double GetEncoderTickVelocity() const override;
 
-
-    std::shared_ptr<sim::SimCapableEncoder> MakeSimEncoder() override;
    private: 
     ctre::phoenix::motorcontrol::can::TalonSRX *_controller;
   };
@@ -107,8 +92,6 @@ namespace wom {
     double GetEncoderRawTicks() const override;
     double GetEncoderTickVelocity() const override;
 
-
-    std::shared_ptr<sim::SimCapableEncoder> MakeSimEncoder() override;
    private: 
     frc::DutyCycleEncoder _dutyCycleEncoder;
   };
@@ -123,7 +106,6 @@ namespace wom {
 
       const double constantValue = 0.0;
 
-      std::shared_ptr<sim::SimCapableEncoder> MakeSimEncoder() override;
     private: 
       CANCoder *_canEncoder;
   };

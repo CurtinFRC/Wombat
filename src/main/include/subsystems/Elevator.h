@@ -1,6 +1,6 @@
 #pragma once 
 
-#include "Gearbox.h"
+#include "utils/Gearbox.h"
 #include "PID.h"
 #include "behaviour/HasBehaviour.h"
 #include "behaviour/Behaviour.h"

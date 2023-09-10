@@ -1,12 +1,9 @@
 #pragma once
 
-#include "sim/SimGyro.h"
 #include <frc/interfaces/Gyro.h>
 
 namespace wom {
   class Gyro : public frc::Gyro {
-   public:
-    virtual std::shared_ptr<sim::SimCapableGyro> MakeSimGyro() = 0;
   };
 
   class NavX : public Gyro {
@@ -23,8 +20,6 @@ namespace wom {
     units::radian_t GetRoll();
 
     void SetAngle(units::radian_t angle);
-
-    std::shared_ptr<sim::SimCapableGyro> MakeSimGyro() override;
    private:
     class Impl;
     Impl *impl;

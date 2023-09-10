@@ -1,4 +1,4 @@
-#include "Encoder.h"
+#include "utils/Encoder.h"
 #include <iostream>
 
 using namespace wom;
@@ -63,7 +63,6 @@ double DigitalEncoder::GetEncoderRawTicks() const {
 }
 
 double DigitalEncoder::GetEncoderTickVelocity() const {
-  // return 1.0 / (double)_nativeEncoder.GetPeriod();
   return _nativeEncoder.GetRate();
 }
 
@@ -71,20 +70,11 @@ CANSparkMaxEncoder::CANSparkMaxEncoder(rev::CANSparkMax *controller, double redu
   : Encoder(42, reduction, 2), _encoder(controller->GetEncoder()) {}
 
 double CANSparkMaxEncoder::GetEncoderRawTicks() const {
-  // Encoder.encoderType = 0;
-  #ifdef PLATFORM_ROBORIO
-    return _encoder.GetPosition() * _reduction; // num rotations 
-  #else
-    return _simTicks;
-  #endif
+  return _encoder.GetPosition() * _reduction;
 }
 
 double CANSparkMaxEncoder::GetEncoderTickVelocity() const {
-  #ifdef PLATFORM_ROBORIO
-    return _encoder.GetVelocity() * GetEncoderTicksPerRotation() / 60;
-  #else
-    return _simVelocity;
-  #endif
+  return _encoder.GetVelocity() * GetEncoderTicksPerRotation() / 60;
 }
 
 TalonFXEncoder::TalonFXEncoder(ctre::phoenix::motorcontrol::can::TalonFX *controller, double reduction)
@@ -129,7 +119,7 @@ double DutyCycleEncoder::GetEncoderTickVelocity() const {
 
 CanEncoder::CanEncoder(int deviceNumber, double ticksPerRotation, double reduction)
   : Encoder(ticksPerRotation, reduction, 1) {
-    _canEncoder = new CANCoder(deviceNumber);
+    _canEncoder = new CANCoder(deviceNumber, "Drivebase");
   }
 
 double CanEncoder::GetEncoderRawTicks() const {
@@ -140,78 +130,3 @@ double CanEncoder::GetEncoderTickVelocity() const {
   return _canEncoder->GetVelocity();
 }
 
-/* SIM */
-#include "frc/simulation/EncoderSim.h"
-
-class SimDigitalEncoder : public sim::SimCapableEncoder {
- public:
-  SimDigitalEncoder(wom::Encoder *encoder, frc::Encoder *frcEncoder) : encoder(encoder), sim(*frcEncoder) {}
-  
-  void SetEncoderTurns(units::turn_t turns) override {
-    sim.SetCount(turns.value() * encoder->GetEncoderTicksPerRotation());
-  }
-
-  void SetEncoderTurnVelocity(units::turns_per_second_t speed) override {
-    sim.SetRate(speed.value() * encoder->GetEncoderTicksPerRotation());
-  }
- private:
-  wom::Encoder *encoder;
-  frc::sim::EncoderSim sim;
-};
-
-std::shared_ptr<sim::SimCapableEncoder> DigitalEncoder::MakeSimEncoder() {
-  return std::make_shared<SimDigitalEncoder>(this, &_nativeEncoder);
-}
-
-namespace wom {
-  class SimCANSparkMaxEncoder : public sim::SimCapableEncoder {
-  public:
-    SimCANSparkMaxEncoder(wom::CANSparkMaxEncoder *encoder) : encoder(encoder) {}
-
-    void SetEncoderTurns(units::turn_t turns) override {
-      encoder->_simTicks = turns.value() * encoder->GetEncoderTicksPerRotation();
-    }
-
-    void SetEncoderTurnVelocity(units::turns_per_second_t speed) override {
-      encoder->_simVelocity = speed.value() * encoder->GetEncoderTicksPerRotation();
-    }
-  private:
-    wom::CANSparkMaxEncoder *encoder;
-  };
-}
-
-std::shared_ptr<sim::SimCapableEncoder> CANSparkMaxEncoder::MakeSimEncoder() {
-  return std::make_shared<SimCANSparkMaxEncoder>(this);
-}
-
-class SimTalonFXEncoder : public sim::SimCapableEncoder {
- public:
-  SimTalonFXEncoder(wom::Encoder *encoder, TalonFX *talonFX) : encoder(encoder), sim(talonFX->GetSimCollection()) {}
-
-  void SetEncoderTurns(units::turn_t turns) override {
-    sim.SetIntegratedSensorRawPosition(turns.value() * encoder->GetEncoderTicksPerRotation());
-  }
-
-  void SetEncoderTurnVelocity(units::turns_per_second_t speed) override {
-    sim.SetIntegratedSensorVelocity(speed.value() * encoder->GetEncoderTicksPerRotation() / 10.0);
-  }
- private:
-  wom::Encoder *encoder;
-  ctre::phoenix::motorcontrol::TalonFXSimCollection &sim;
-};
-
-std::shared_ptr<sim::SimCapableEncoder> TalonFXEncoder::MakeSimEncoder() {
-  return std::make_shared<SimTalonFXEncoder>(this, _controller);
-}
-
-std::shared_ptr<sim::SimCapableEncoder> TalonSRXEncoder::MakeSimEncoder() {
-  return nullptr;
-}
-
-std::shared_ptr<sim::SimCapableEncoder> DutyCycleEncoder::MakeSimEncoder() {
-  return nullptr;
-}
-
-std::shared_ptr<sim::SimCapableEncoder> CanEncoder::MakeSimEncoder() {
-  return nullptr;
-}

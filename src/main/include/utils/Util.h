@@ -1,5 +1,6 @@
 #pragma once
 
+#include <frc/RobotController.h>
 #include <networktables/NetworkTable.h>
 
 #include <frc/geometry/Pose2d.h>
@@ -7,8 +8,19 @@
 
 #include <functional>
 #include <iostream>
+#include <cmath>
+
+#include <units/time.h>
 
 namespace wom {
+  template<typename T>
+  T&& invert(T &&system) {
+    system.SetInverted(true);
+    return system;
+  }
+
+  units::second_t now();
+
   class NTBound {
    public:
     NTBound(std::shared_ptr<nt::NetworkTable> table, std::string name, const nt::Value &value, std::function<void(const nt::Value &)> onUpdateFn)
@@ -59,4 +71,6 @@ namespace wom {
   void WritePose2NT(std::shared_ptr<nt::NetworkTable> table, frc::Pose2d pose);
   void WritePose3NT(std::shared_ptr<nt::NetworkTable> table, frc::Pose3d pose);
 
+  double deadzone(double val, double deadzone = 0.05);
+  double spow2(double val);
 }

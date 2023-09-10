@@ -1,6 +1,6 @@
 #pragma once 
 
-#include "Encoder.h"
+#include "utils/Encoder.h"
 #include "VoltageController.h"
 #include <frc/system/plant/DCMotor.h>
 

@@ -1,8 +1,8 @@
 #pragma once
 
 #include "behaviour/HasBehaviour.h"
-#include "Encoder.h"
-#include "Gearbox.h"
+#include "utils/Encoder.h"
+#include "utils/Gearbox.h"
 #include "PID.h"
 
 #include <frc/DigitalInput.h>

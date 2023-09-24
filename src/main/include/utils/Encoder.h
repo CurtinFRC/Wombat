@@ -5,7 +5,8 @@
 #include <units/angular_velocity.h>
 
 #include <rev/CANSparkMax.h>
-#include <ctre/phoenix.h>
+#include <ctre/phoenix/motorcontrol/can/TalonSRX>
+#include <ctre/phoenix/motorcontrol/can/TalonFX>
 #include <frc/DutyCycleEncoder.h>
 
 #include "utils/Util.h"

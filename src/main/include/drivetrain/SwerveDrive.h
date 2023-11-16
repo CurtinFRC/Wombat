@@ -1,255 +1,124 @@
 #pragma once
 
-#include "Gearbox.h"
-#include "Gyro.h"
-#include "behaviour/HasBehaviour.h"
-#include "behaviour/Behaviour.h"
-#include "VoltageController.h"
-#include <frc/interfaces/Gyro.h>
-#include "PID.h"
-#include <ctre/phoenix.h>
+#include <networktables/NetworkTableInstance.h>
+#include <networktables/NetworkTable.h>
+#include <networktables/DoubleTopic.h>
 
 #include <units/angular_velocity.h>
 #include <units/charge.h>
-#include <units/moment_of_inertia.h>
+#include <units/math.h>
+#include <units/time.h>
+#include <units/velocity.h>
 
-#include <frc/kinematics/SwerveDriveKinematics.h>
-#include <frc/estimator/SwerveDrivePoseEstimator.h>
+#include <iostream>
+#include <string>
+#include <memory>
+
+#include "behaviour/HasBehaviour.h"
+#include "utils/Gearbox.h"
+#include "utils/PID.h"
+#include "utils/Util.h"
+#include "vision/Limelight.h"
 
 namespace wom {
-  enum class SwerveModuleState {
-    kZeroing,
-    kIdle, 
-    kPID
+namespace drivetrain {
+  enum class SwerveModuleName {
+    FrontLeft,
+    FrontRight,
+    BackLeft,
+    BackRight,
   };
 
   struct SwerveModuleConfig {
-    frc::Translation2d position;
+    wom::utils::Gearbox rotationGearbox;
+    wom::utils::Gearbox movementGearbox;
 
-    Gearbox driveMotor;
-    Gearbox turnMotor;
+    wom::utils::PIDConfig<units::radians_per_second, units::volt> rotationalVelocityPID;
+    wom::utils::PIDConfig<units::meters_per_second, units::volt> movementVelocityPID;
 
-    CANCoder *canEncoder;
+    wom::utils::PIDConfig<units::radian, units::radians_per_second> rotationPID;
+    wom::utils::PIDConfig<units::meter, units::meters_per_second> movementPID;
 
     units::meter_t wheelRadius;
 
-    void WriteNT(std::shared_ptr<nt::NetworkTable> table) const;
+    std::string path;
+    SwerveModuleName name;
   };
 
-  class SwerveModule {
-   public:
-    using angle_pid_conf_t = PIDConfig<units::radian, units::volt>;
-    using velocity_pid_conf_t = PIDConfig<units::meters_per_second, units::volt>;
+  enum class SwerveModuleState {
+    kIdle,
+    kCalibration,
+    kPID,
+  };
 
-    SwerveModule(std::string path, SwerveModuleConfig config, angle_pid_conf_t anglePID, velocity_pid_conf_t velocityPID);
-    void OnUpdate(units::second_t dt);
+  class SwerveModule : public behaviour::HasBehaviour {
+  public:
+    explicit SwerveModule(SwerveModuleConfig config, SwerveModuleState state);
+
+    SwerveModuleConfig GetConfig();
+    SwerveModuleState GetState();
+
+    void SetState(SwerveModuleState state);
+
+    void Log();
+    units::meters_per_second_t GetSpeed();
+    void PIDControl(units::second_t dt, units::radian_t rotation, units::meter_t movement);
+
     void OnStart();
+    void OnUpdate(units::second_t dt, units::radian_t rotation, units::meter_t movement);
 
-    /**
-     * @brief This function acts to aid the robot matching the joystick's angle
-     * @param speeds
-     * Contains the xVelocity, yVelocity and the rotationalSpeed that the robot will be moving in
-    */
-    void ModuleVectorHandler(frc::ChassisSpeeds speeds);
+  protected:
+    wom::utils::PIDController<units::radians_per_second, units::volt> _rotationalVelocityPID;
+    wom::utils::PIDController<units::meters_per_second, units::volt> _movementVelocityPID;
 
-    void SetZero(units::second_t dt);
-    void SetIdle();
-    void SetPID(units::radian_t angle, units::meters_per_second_t speed, units::second_t dt);
-    void SetZero();  
-    void SetVoltageLimit(units::volt_t driveModuleVoltageLimit);
+    wom::utils::PIDController<units::radian, units::radians_per_second> _rotationalPID;
+    wom::utils::PIDController<units::meters, units::meters_per_second> _movementPID;
 
-    //double GetCancoderPosition(); // from liam's
+  private:
+    units::volt_t voltageRotation;
+    units::volt_t voltageMovement;
 
+    units::meters_per_second_t velocity;
+    units::radians_per_second_t angularVelocity;
 
-    void SetAccelerationLimit(units::meters_per_second_squared_t limit);
-
-    // frc::SwerveModuleState GetState();
-    frc::SwerveModulePosition GetPosition() const;
-
-    units::meters_per_second_t GetSpeed() const;
-    units::meter_t GetDistance() const;
-
-    const SwerveModuleConfig &GetConfig() const;
-
-    PIDController<units::radians, units::volt> _anglePIDController;
-   private:
     SwerveModuleConfig _config;
     SwerveModuleState _state;
-    units::volt_t _driveModuleVoltageLimit = 10_V;
 
-    bool _hasZeroedEncoder = false; 
-    bool _hasZeroed = false;
-
-    PIDController<units::meters_per_second, units::volt> _velocityPIDController;
-
-    std::shared_ptr<nt::NetworkTable> _table;
-
-    double startingPos;
-
-    double _offset;
-    units::meters_per_second_squared_t _currentAccelerationLimit = 6_mps / 1_s;
+    std::string name;
+    std::shared_ptr<nt::NetworkTable> table;
   };
 
-  struct SwerveDriveConfig {
-    using pose_angle_conf_t = PIDConfig<units::radian, units::radians_per_second>;
-    using pose_position_conf_t = PIDConfig<units::meter, units::meters_per_second>;
-    using balance_conf_t = PIDConfig<units::degree, units::meters_per_second>;
-
-    std::string path;
-    SwerveModule::angle_pid_conf_t anglePID;
-    SwerveModule::velocity_pid_conf_t velocityPID;
-
-    wpi::array<SwerveModuleConfig, 4> modules;
-
-    Pigeon2 *gyro;
-
-    pose_angle_conf_t poseAnglePID;
-    pose_position_conf_t posePositionPID;
-
-    units::kilogram_t mass;
-
-    wpi::array<double, 3> stateStdDevs{0.0, 0.0, 0.0};
-    wpi::array<double, 3> visionMeasurementStdDevs{0.0, 0.0, 0.0};
-
-    void WriteNT(std::shared_ptr<nt::NetworkTable> table);
+  struct SwerveConfig {
+    SwerveModule frontLeft;
+    SwerveModule frontRight;
+    SwerveModule backLeft;
+    SwerveModule backRight;
   };
 
-  enum class SwerveDriveState {
-    kZeroing,
-    kIdle, 
-    kVelocity,
-    kFieldRelativeVelocity,
+  enum class SwerveState {
+    kIdle,
     kPose,
-    kIndividualTuning,
-    kTuning,
-    kXWheels,
-    kModuleTurn,
-    kFRVelocityRotationLock
+    kFieldRelative,
   };
 
-  struct FieldRelativeSpeeds {
-    /**
-     * Represents the velocity in the x dimension (your alliance to opposite alliance)
-     */
-    units::meters_per_second_t vx{0};
-    /**
-     * Represents the velocity in the y dimension (to your left when standing behind alliance wall)
-     */
-    units::meters_per_second_t vy{0};
-    /**
-     * The angular velocity of the robot (CCW is +)
-     */
-    units::radians_per_second_t omega{0};
+  class Swerve : public behaviour::HasBehaviour {
+  public:
+    explicit Swerve(SwerveConfig config, SwerveState state, wom::vision::Limelight vision);
 
-    frc::ChassisSpeeds ToChassisSpeeds(const units::radian_t robotHeading);
-  };
+    SwerveConfig GetConfig();
+    SwerveState GetState();
 
-  class SwerveDrive : public behaviour::HasBehaviour {
-   public:
-    SwerveDrive(SwerveDriveConfig config, frc::Pose2d initialPose);
+    void SetState(SwerveState state);
+    void PoseControl(frc::Pose3d desiredPose, units::second_t dt);
 
-    void OnUpdate(units::second_t dt);
     void OnStart();
+    void OnUpdate(units::second_t dt, wom::vision::Limelight vision,  frc::Pose3d desiredPose);
 
-    /**
-     * @brief This function switches the state to handle the robot's rotation matching that of the joystick
-    */
-    void RotateMatchJoystick(units::radian_t joystickAngle, FieldRelativeSpeeds speeds);
-    
-    void SetIdle();
-
-    void SetZeroing();
-
-    void SetVelocity(frc::ChassisSpeeds speeds);
-    void SetFieldRelativeVelocity(FieldRelativeSpeeds speeds);
-    void SetPose(frc::Pose2d pose);
-    bool IsAtSetPose();
-    void SetIndividualTuning(int mod, units::radian_t angle, units::meters_per_second_t speed);
-    void SetTuning(units::radian_t angle, units::meters_per_second_t speed);
-    void SetZero();
-    void SetVoltageLimit(units::volt_t driveVoltageLimit);
-
-    // double GetModuleCANPosition(int mod);  // from liam's
-
-    void SetXWheelState();
-
-    void SetIsFieldRelative(bool value);
-    bool GetIsFieldRelative();
-
-    void SetAccelerationLimit(units::meters_per_second_squared_t limit);
-
-    void ResetPose(frc::Pose2d pose);
-
-    frc::Pose2d GetPose();
-    void AddVisionMeasurement(frc::Pose2d pose, units::second_t timestamp);
-
-    SwerveDriveConfig &GetConfig() { return _config; }
-
-   protected:
-
-   private:
-    SwerveDriveConfig _config;
-    SwerveDriveState _state = SwerveDriveState::kIdle;
-    std::vector<SwerveModule> _modules;
-
-    units::degree_t _requestedAngle;
-    FieldRelativeSpeeds _requestedSpeeds;
-
-    frc::ChassisSpeeds _target_speed;
-    FieldRelativeSpeeds _target_fr_speeds;
-
-    frc::SwerveDriveKinematics<4> _kinematics;
-    frc::SwerveDrivePoseEstimator<4> _poseEstimator;
-
-    PIDController<units::radian, units::radians_per_second> _anglePIDController;
-    PIDController<units::meter, units::meters_per_second> _xPIDController;
-    PIDController<units::meter, units::meters_per_second> _yPIDController;
-
-    std::shared_ptr<nt::NetworkTable> _table;
-
-    bool _isFieldRelative = true;
-    bool isRotateToMatchJoystick = false;
-
-    int _mod;
-    units::radian_t _angle;
-    units::meters_per_second_t _speed;
-
-    double frontLeftEncoderOffset = -143.26171875;
-    double frontRightEncoderOffset = 167.87109375;
-    double backLeftEncoderOffset = -316.669921875;
-    double backRightEncoderOffset = -119.619140625;
+  protected:
+  private:
+    SwerveConfig _config;
+    SwerveState _state;
+    wom::vision::Limelight _vision;
   };
-
-  namespace sim {
-    class SwerveDriveSim {
-     public:
-      SwerveDriveSim(SwerveDriveConfig config, units::kilogram_square_meter_t moduleJ);
-
-      void Update(units::second_t dt);
-
-      SwerveDriveConfig config;
-      frc::SwerveDriveKinematics<4> kinematics;
-      units::kilogram_square_meter_t moduleJ;
-      std::shared_ptr<nt::NetworkTable> table;
-
-      std::vector<std::shared_ptr<SimCapableEncoder>> driveEncoders;
-      std::vector<std::shared_ptr<SimCapableEncoder>> turnEncoders;
-      std::shared_ptr<SimCapableGyro> gyro;
-
-      units::ampere_t totalCurrent = 0_A;
-      wpi::array<units::ampere_t, 4> driveCurrents { 0_A, 0_A, 0_A, 0_A };
-      wpi::array<units::ampere_t, 4> turnCurrents { 0_A, 0_A, 0_A, 0_A };
-      wpi::array<units::radians_per_second_t, 4> turnSpeeds { 0_rad / 1_s, 0_rad / 1_s, 0_rad / 1_s, 0_rad / 1_s };
-      wpi::array<units::radians_per_second_t, 4> driveSpeeds { 0_rad / 1_s, 0_rad / 1_s, 0_rad / 1_s, 0_rad / 1_s };
-      wpi::array<units::meters_per_second_t, 4> driveVelocity { 0_mps, 0_mps, 0_mps, 0_mps };
-      wpi::array<units::radian_t, 4> turnAngles { 0_rad, 0_rad, 0_rad, 0_rad };
-      wpi::array<units::radian_t, 4> driveEncoderAngles { 0_rad, 0_rad, 0_rad, 0_rad };
-
-      units::radian_t angle{0};
-      units::radians_per_second_t angularVelocity{0};
-      units::meter_t x{0}, y{0};
-      units::meters_per_second_t vx{0}, vy{0};
-    };
-  }
-}
-
+}; // namespace drivetrain
+}; // namespace wom
